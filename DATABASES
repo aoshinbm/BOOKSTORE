@@ -1,0 +1,62 @@
+mysql> desc userregistration;
++-----------+--------------+------+-----+---------+----------------+
+| Field     | Type         | Null | Key | Default | Extra          |
++-----------+--------------+------+-----+---------+----------------+
+| Id        | int          | NO   | PRI | NULL    | auto_increment |
+| FirstName | varchar(255) | NO   |     | NULL    |                |
+| LastName  | varchar(255) | NO   |     | NULL    |                |
+| Email     | varchar(255) | NO   | UNI | NULL    |                |
+| Username  | varchar(255) | NO   | UNI | NULL    |                |
+| Password  | varchar(255) | NO   |     | NULL    |                |
++-----------+--------------+------+-----+---------+----------------+
+6 rows in set (0.03 sec)
+
+mysql> desc orderdetails;
++----------+--------------+------+-----+---------+----------------+
+| Field    | Type         | Null | Key | Default | Extra          |
++----------+--------------+------+-----+---------+----------------+
+| orderid  | int          | NO   | PRI | NULL    | auto_increment |
+| itemname | varchar(350) | NO   |     | NULL    |                |
+| address  | varchar(550) | NO   |     | NULL    |                |
+| amount   | int          | NO   |     | NULL    |                |
+| status   | varchar(35)  | NO   |     | NULL    |                |
++----------+--------------+------+-----+---------+----------------+
+5 rows in set (0.00 sec)
+
+create table orderdetails(
+  orderid int auto_increment primary key,
+  itemname varchar(350) not null,
+  address varchar(550) not null,
+  amount int not null,
+  status varchar(35) not null 
+);
+mysql> desc bookrecord;
++--------+--------------+------+-----+---------+----------------+
+| Field  | Type         | Null | Key | Default | Extra          |
++--------+--------------+------+-----+---------+----------------+
+| BOOKID | int          | NO   | PRI | NULL    | auto_increment |
+| Title  | varchar(300) | NO   |     | NULL    |                |
+| Author | varchar(300) | NO   |     | NULL    |                |
+| Year   | varchar(20)  | NO   |     | NULL    |                |
++--------+--------------+------+-----+---------+----------------+
+4 rows in set (0.00 sec)
+
+create table cartdetails(
+  cartid int auto_increment primary key,
+  item_name varchar(350) not null,
+  quantity varchar(550) not null,
+  total_amount int not null,
+  status varchar(35) not null 
+);
+mysql> desc cartdetails;
++--------------+--------------+------+-----+---------+----------------+
+| Field        | Type         | Null | Key | Default | Extra          |
++--------------+--------------+------+-----+---------+----------------+
+| cartid       | int          | NO   | PRI | NULL    | auto_increment |
+| item_name    | varchar(350) | NO   |     | NULL    |                |
+| quantity     | varchar(550) | NO   |     | NULL    |                |
+| total_amount | int          | NO   |     | NULL    |                |
+| status       | varchar(35)  | NO   |     | NULL    |                |
++--------------+--------------+------+-----+---------+----------------+
+5 rows in set (0.00 sec)
+

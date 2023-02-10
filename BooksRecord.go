@@ -3,8 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -26,13 +24,7 @@ var db *sql.DB
 var err error
 
 func main() {
-	// Open up our database connection.
-	db, err = sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/BOOKSTORE")
-	// if there is an error opening the connection, handle it
-	if err != nil {
-		log.Print(err.Error())
-	}
-	defer db.Close()
+	DatabaseConnection()
 
 	bk := BOOK_RECORD{BOOKID: 1, Title: "Harry Potter", Author: "J K Rowling", Year: "1997"}
 	BOOKZ = append(BOOKZ, bk)
@@ -53,8 +45,7 @@ func main() {
 	http.HandleFunc("/books/{id}", handleBookRecords)
 
 	//start the server
-	fmt.Println("Starting server on port 8082...")
-	log.Fatal(http.ListenAndServe(":8082", nil))
+	StartServer()
 }
 
 // handleStocks
@@ -76,11 +67,13 @@ func handleBookRecords(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ● GET /getBooks - to retrieve all books
 func getBooksFullList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	// Execute the query
 	results, err := db.Query("SELECT BOOKID ,Title ,Author ,Year FROM BookRecord")
 	if err != nil {
-		panic(err.Error()) // proper error handling instead of panic in your app
+		panic(err.Error())
 	}
 	for results.Next() {
 		var getBook BOOK_RECORD
@@ -94,7 +87,48 @@ func getBooksFullList(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(BOOKZ)
 }
+
+// ● GET /getBookByName/{bookName} - to retrieve a book by its name
+func getBookByName(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var getBuk BOOK_RECORD
+	results, err := db.Query("SELECT BOOKID ,Title ,Author ,Year FROM BookRecord where Title=?", getBuk.Title)
+	if err != nil {
+		panic(err.Error())
+	}
+	for results.Next() {
+		err := results.Scan(&getBuk.BOOKID, &getBuk.Title, &getBuk.Author, &getBuk.Year)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError) // proper error handling instead of panic in your app
+			return
+		}
+		BOOKZ = append(BOOKZ, getBuk)
+	}
+	json.NewEncoder(w).Encode(BOOKZ)
+}
+
+// ● GET /getBook/{bookId} - to retrieve a book by its id
+func getBook(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var getBookId BOOK_RECORD
+	results, err := db.Query("SELECT BOOKID ,Title ,Author ,Year FROM BookRecord where BOOKID=?", getBookId.BOOKID)
+	if err != nil {
+		panic(err.Error())
+	}
+	for results.Next() {
+		err := results.Scan(&getBookId.BOOKID, &getBookId.Title, &getBookId.Author, &getBookId.Year)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError) // proper error handling instead of panic in your app
+			return
+		}
+		BOOKZ = append(BOOKZ, getBookId)
+	}
+	json.NewEncoder(w).Encode(BOOKZ)
+}
+
+// ● POST /addBook - to add a new book to the repository
 func addPostBooks(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var postBook BOOK_RECORD
 	json.NewDecoder(r.Body).Decode(&postBook)
 	//read from the request
@@ -109,49 +143,44 @@ func addPostBooks(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Data added successfully..."))
 }
 
+// ● DELETE /delete/{bookId} - to delete a book record by its id
 func removeBook(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.URL.Path[len("/books/"):])
+	w.Header().Set("Content-Type", "application/json")
+	book_id, err := strconv.Atoi(r.URL.Path[len("/books/{id}"):])
 	if err != nil {
-		http.Error(w, "Invalid product ID", http.StatusBadRequest)
+		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
 		return
 	}
-	fmt.Println(r.URL.Path[len("/books/"):])
-	path := "/books/12"
-	bukid := path[8:]
-	fmt.Println(bukid)
-
-	result, err := db.Query("delete from product where id = ?", id)
+	deleteBookID, err := db.Exec("delete from BookRecord where BOOKID=?", book_id)
 	if err != nil {
-		panic(err.Error())
+		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-	//BOOKZ = append(BOOKZ, postBook)
-	//json.NewEncoder(w).Encode(BOOKZ) //optional
-	w.Write([]byte("Data deleted..."))
 
-	for i, data_id := range BOOKZ {
-		if data_id.BOOKID == id {
-			BOOKZ = append(BOOKZ[:i], BOOKZ...)
-			w.WriteHeader(http.StatusNoContent)
-		}
+	del_Book, err := deleteBookID.RowsAffected()
+	if err != nil {
+		panic(err)
 	}
+	print(del_Book)
+	w.Write([]byte("Book Record DELETED successfully..."))
 }
-func updatePutBooks(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.URL.Path[len("/books/"):])
-	if err != nil {
-		panic(err.Error())
-	}
-	fmt.Println(r.URL.Path[len("/books/"):])
-	path := "/books/1"
-	book_id := path[:]
-	fmt.Println(book_id)
 
-	for i, bookdata := range BOOKZ {
-		if bookdata.BOOKID == id {
-			var newBook BOOK_RECORD
-			json.NewDecoder(r.Body).Decode(&newBook)
-			newBook.BOOKID = id
-			BOOKZ[i] = newBook
-			json.NewEncoder(w).Encode(newBook)
-		}
+// ● PUT /update/{bookId} - to update a book record by its id
+func updatePutBooks(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	book_id, err := strconv.Atoi(r.URL.Path[len("/books/{id}"):])
+	if err != nil {
+		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
+		return
 	}
+	ress, err := db.Exec("Update BookRecord set BOOKID=?,Title=? ,Author=? ,Year=? where BOOKID=?)", book_id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	bookUpdated, err := ress.RowsAffected()
+	if err != nil {
+		panic(err)
+	}
+	print(bookUpdated)
+	w.Write([]byte("Book Record UPDATED successfully..."))
 }

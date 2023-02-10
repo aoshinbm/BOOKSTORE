@@ -12,7 +12,7 @@ import (
 )
 
 type USERREGIST struct {
-	USERID    int    `json:"id"`
+	USERID    int    `json:"userid"`
 	Username  string `json:"username"`
 	FirstName string `json:"firstname"`
 	LastName  string `json:"lastname"`
@@ -45,7 +45,9 @@ func main() {
 	//http.HandleFunc("/", homePage)
 	http.HandleFunc("/users", handleUserRegistration)
 	http.HandleFunc("/users/{id}", handleUserRegistration)
+	http.HandleFunc("/users/login", getLoginList)
 
+	//start the server
 	//start the server
 	fmt.Println("Starting server on port 8082...")
 	log.Fatal(http.ListenAndServe(":8082", nil))
@@ -54,26 +56,23 @@ func main() {
 // 2 parameters :- response is interface, request is struct
 func handleUserRegistration(w http.ResponseWriter, r *http.Request) {
 	//r.method returns which method is the request calling
-	/*
-			UserRegistrationController
-		● GET /api/userservice/get/{userId}: retrieves a single user record with the given userId
-		● GET /api/userservice/getAll/{token}: retrieves all user records using the token passed as
-		a parameter
-		● GET /api/userservice/verify/{token}: verifies the given token
-		● POST /api/userservice/login: logs in the user, using the LoginDTO request body
+	/* UserRegistrationController
+	● GET /api/userservice/getAll/{token}: retrieves all user records using the token passed as
+	a parameter
+	● GET /api/userservice/verify/{token}: verifies the given token
+	● POST /api/userservice/login: logs in the user, using the LoginDTO request body
 	*/
 	switch r.Method {
 	case "GET":
 		//● GET /api/userservice: retrieves all user records
 		getUsersFullList(w, r)
+		//● GET /api/userservice/get/{userId}: retrieves a single user record with the given userId
 	case "POST":
-		//● POST /api/userservice/register: creates a new user record by registering the user,
-		//using the UserRegistrationDTO request body
+		//● POST /api/userservice/register: creates a new user record by registering the user, using the UserRegistrationDTO request body
 		addPostUsers(w, r)
-	//case "PUT":
-	//● PUT /api/userservice/update/{userId}: updates a user record with the given userId,
-	// using the UserRegistrationDTO request body
-	//updatePostUsers(w, r)
+	case "PUT":
+		//● PUT /api/userservice/update/{userId}: updates a user record with the given userId, using the UserRegistrationDTO request body
+		updatePutUsers(w, r)
 	case "DELETE":
 		//● DELETE /api/userservice/delete/{userId}: deletes a user record with the given userId
 		removeUser(w, r)
@@ -94,53 +93,107 @@ func getUsersFullList(w http.ResponseWriter, r *http.Request) {
 		// for each row, scan the result into our tag composite object
 		err := results.Scan(&ress.USERID, &ress.Username, &ress.FirstName, &ress.LastName, &ress.Password, &ress.Email)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError) // proper error handling instead of panic in your app
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		USER = append(USER, ress)
 	}
 	json.NewEncoder(w).Encode(USER)
 }
+func getUser(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var gettUser USERREGIST
+	// Execute the query
+	results, err := db.Query("SELECT Id ,Username ,FirstName ,LastName ,Password ,Email FROM UserRegistration where Id=?", gettUser.USERID)
+	if err != nil {
+		panic(err.Error())
+	}
+	for results.Next() {
+		// for each row, scan the result into our tag composite object
+		err := results.Scan(&gettUser.USERID, &gettUser.Username, &gettUser.FirstName, &gettUser.LastName, &gettUser.Password, &gettUser.Email)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		USER = append(USER, gettUser)
+	}
+	json.NewEncoder(w).Encode(USER)
+}
+
 func addPostUsers(w http.ResponseWriter, r *http.Request) {
 	var post USERREGIST
+	w.Header().Set("Content-Type", "application/json")
 	json.NewDecoder(r.Body).Decode(&post)
 	//read from the request
 	// Execute the query
 	_, err := db.Query("INSERT INTO UserRegistration (Id, Username, FirstName, LastName, Password, Email) VALUES (?,?,?,?,?,?)", post.USERID, post.Username, post.FirstName, post.LastName, post.Password, post.Email)
-	//.Scan(&post.USERID,&post.Username, &post.FirstName, &post.LastName, &post.Password, &post.Email)
 	if err != nil {
 		panic(err.Error())
 	}
-
+	//.Scan(&post.USERID,&post.Username, &post.FirstName, &post.LastName, &post.Password, &post.Email)
 	//USER = append(USER, post)
 	//json.NewEncoder(w).Encode(USER) //optional
 	w.Write([]byte("Data added successfully..."))
 }
 
 func removeUser(w http.ResponseWriter, r *http.Request) {
-	for i, _ := range USER {
-		USER = append(USER[:i], USER[i+1:]...)
-		w.WriteHeader(http.StatusNoContent)
+	w.Header().Set("Content-Type", "application/json")
+	id, err := strconv.Atoi(r.URL.Path[len("/users/{id}"):])
+	if err != nil {
+		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
+		return
 	}
-}
 
-func updatePutUsers(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.URL.Path[len("/users/"):])
+	deleteID, err := db.Exec("delete from UserRegistration where Id=?", id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	result, err := deleteID.RowsAffected()
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Println(r.URL.Path[len("/users/"):])
-	path := "/users/1"
-	userId := path[8:]
-	fmt.Println(userId)
+	print(result)
+	w.Write([]byte("Data DELETED successfully..."))
+}
 
-	for i, userdata := range USER {
-		if userdata.USERID == id {
-			var newUserr USERREGIST
-			json.NewDecoder(r.Body).Decode(&newUserr)
-			newUserr.USERID = id
-			USER[i] = newUserr
-			json.NewEncoder(w).Encode(newUserr)
-		}
+func updatePutUsers(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	id, err := strconv.Atoi(r.URL.Path[len("/users/{id}"):])
+	if err != nil {
+		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
+		return
 	}
+
+	res, err := db.Exec("Update UserRegistration set Id=?, Username=?, FirstName=?, LastName=?, Password=?, Email=? where id=?)", id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	updated, err := res.RowsAffected()
+	if err != nil {
+		panic(err.Error())
+	}
+	print(updated)
+	w.Write([]byte("Data UPDATED successfully..."))
+}
+
+
+func getLoginList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	// Execute the query
+	var userlogin USERREGIST
+	results, err := db.Query("SELECT Username ,Password FROM UserRegistrationwhere Username=?"), userlogin.Username)
+	if err != nil {
+		panic(err.Error())
+	}
+	for results.Next() {
+		err := results.Scan(&userlogin.Username, &userlogin.Password)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		//PERSON = append(PERSON, userlogin)
+	}
+	json.NewEncoder(w).Encode(PERSON)
 }

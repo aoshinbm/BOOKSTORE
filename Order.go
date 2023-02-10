@@ -3,8 +3,6 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 
@@ -14,10 +12,11 @@ import (
 // model of order
 // models will specify the attributes of the order record that will be added to the order database
 type ORDER_DETAILS struct {
-	ORDERID    int    `json:id`
-	ORDER_NAME string `json:order_name`
-	Quantity   int    `json:quantity`
-	STATUS     string `json:status`
+	ORDERID   int    `json:id`
+	ITEM_NAME string `json:order_name`
+	ADDRESS   string `json:address`
+	AMOUNT    string `json:amount`
+	STATUS    string `json:status`
 }
 
 var ORDER []ORDER_DETAILS
@@ -25,26 +24,20 @@ var db *sql.DB
 var err error
 
 func main() {
-	// Open up our database connection.
-	db, err = sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/BOOKSTORE")
-	// if there is an error opening the connection, handle it
-	if err != nil {
-		log.Print(err.Error())
-	}
-	defer db.Close()
+	DatabaseConnection()
 
-	or := ORDER_DETAILS{ORDERID: 1, ORDER_NAME: "Harry Potter", Quantity: 2, STATUS: "Confirmed"}
+	or := ORDER_DETAILS{ORDERID: 1, ITEM_NAME: "Harry Potter", ADDRESS: "Goregaon,Mumbai", AMOUNT: "5000", Quantity: 2, STATUS: "Confirmed"}
 	ORDER = append(ORDER, or)
 
 	http.HandleFunc("/orders", handleOrderDetails)
 	http.HandleFunc("/order/{id}", handleOrderDetails)
 
 	//start the server
-	fmt.Println("Starting server on port 8082...")
-	log.Fatal(http.ListenAndServe(":8082", nil))
+	StartServer()
 }
 
 func handleOrderDetails(w http.ResponseWriter, r *http.Request) {
+	//OrderController
 	//r.method returns which method is the request calling
 	switch r.Method {
 	case "GET":
@@ -59,30 +52,56 @@ func handleOrderDetails(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 	}
 }
+
+// ● GET /api/order/retrieveAllOrders - to retrieve all order records
 func getOrderList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	// Execute the query
-	results, err := db.Query("SELECT ORDERID ,ORDER_NAME ,Quantity ,STATUS FROM OrderDetails")
+	results, err := db.Query("SELECT ORDERID ,ITEM_NAME ,ADDRESS,AMOUNT,STATUS FROM OrderDetails")
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
 	for results.Next() {
 		var getOrder ORDER_DETAILS
 		// for each row, scan the result into our tag composite object
-		err := results.Scan(&getOrder.ORDERID, &getOrder.ORDER_NAME, &getOrder.Quantity, &getOrder.STATUS)
+		err := results.Scan(&getOrder.ORDERID, &getOrder.ITEM_NAME, &getOrder.ADDRESS, &getOrder.AMOUNT, &getOrder.STATUS)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError) // proper error handling instead of panic in your app
+			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 		ORDER = append(ORDER, getOrder)
 	}
 	json.NewEncoder(w).Encode(ORDER)
 }
+
+// ● GET /api/order/retrieveOrder/{id} - to retrieve an order record by its id
+func getOrderById(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	var getOrderId ORDER_DETAILS
+	results, err := db.Query("SELECT ORDERID ,ITEM_NAME ,ADDRESS,AMOUNT,STATUS FROM OrderDetails where ORDERID=?", getOrderId.ORDERID)
+	if err != nil {
+		panic(err.Error()) // proper error handling instead of panic in your app
+	}
+	for results.Next() {
+		// for each row, scan the result into our tag composite object
+		err := results.Scan(&getOrderId.ORDERID, &getOrderId.ITEM_NAME, &getOrderId.ADDRESS, &getOrderId.AMOUNT, &getOrderId.STATUS)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError) // proper error handling instead of panic in your app
+			return
+		}
+		ORDER = append(ORDER, getOrderId)
+	}
+	json.NewEncoder(w).Encode(ORDER)
+}
+
+// ● POST /api/order/insert - to insert a new order record
 func addPostOrder(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var postOrder ORDER_DETAILS
 	json.NewDecoder(r.Body).Decode(&postOrder)
 	//read from the request
 	// Execute the query
-	_, err := db.Query("INSERT INTO OrderDetails (ORDERID ,ORDER_NAME ,Quantity ,STATUS) VALUES (?,?,?,?)")
+	_, err := db.Query("INSERT INTO OrderDetails (ORDERID ,ITEM_NAME ,ADDRESS,AMOUNT,STATUS) VALUES (?,?,?,?,?)")
 	//.Scan(&postOrder.ORDERID, &postOrder.ORDER_NAME, &postOrder.Quantity, &postOrder.STATUS)
 	if err != nil {
 		panic(err.Error())
@@ -92,31 +111,44 @@ func addPostOrder(w http.ResponseWriter, r *http.Request) {
 	//json.NewEncoder(w).Encode(ORDER) //optional
 	w.Write([]byte("Data added successfully..."))
 }
-func removeOrder(w http.ResponseWriter, r *http.Request) {
-	for i, _ := range ORDER {
-		ORDER = append(ORDER[:i], ORDER[i+1:]...)
-		w.WriteHeader(http.StatusNoContent)
+
+// ● PUT /api/order/cancelOrder/{id} - to cancel an order record by its id
+func updatePutOrder(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	order_id, err := strconv.Atoi(r.URL.Path[len("/orders/{id}"):])
+	if err != nil {
+		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
+		return
 	}
-	json.NewEncoder(w).Encode(ORDER)
+	ress, err := db.Exec("Update ORDERDETAILS set ORDERID=?,ITEM_NAME=?,ADDRESS=?,AMOUNT=?,STATUS=? where ORDERID=?)", order_id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
+
+	orderUpdated, err := ress.RowsAffected()
+	if err != nil {
+		panic(err)
+	}
+	print(orderUpdated)
+	w.Write([]byte("Order UPDATED successfully..."))
 }
 
-func updatePutOrder(w http.ResponseWriter, r *http.Request) {
-	id, err := strconv.Atoi(r.URL.Path[len("/orders/"):])
+func removeOrder(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	order_id, err := strconv.Atoi(r.URL.Path[len("/order/{id}"):])
 	if err != nil {
-		panic(err.Error())
+		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
+		return
 	}
-	fmt.Println(r.URL.Path[len("/orders/"):])
-	path := "/order/1"
-	orderId := path[8:]
-	fmt.Println(orderId)
+	deleteOrderID, err := db.Exec("delete from ORDERDETAILS where BOOKID=?", order_id)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+	}
 
-	for i, data := range ORDER {
-		if data.ORDERID == id {
-			var newOrder ORDER_DETAILS
-			json.NewDecoder(r.Body).Decode(&newOrder)
-			newOrder.ORDERID = id
-			ORDER[i] = newOrder
-			json.NewEncoder(w).Encode(newOrder)
-		}
+	del_Order, err := deleteOrderID.RowsAffected()
+	if err != nil {
+		panic(err)
 	}
+	print(del_Order)
+	w.Write([]byte("Order DELETED successfully..."))
 }
