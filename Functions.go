@@ -36,3 +36,39 @@ func Error() {
 		panic(err.Error())
 	}
 }
+
+func User_Routes() {
+	http.HandleFunc("/api/userservices/getAllUsers", getUsersFullList)
+	http.HandleFunc("/api/userservices/addUser", addPostUsers)
+	http.HandleFunc("/api/userservices/getUser/{id}", getUser)
+	http.HandleFunc("/api/userservices/updateUser/{id}", updatePutUsers)
+	http.HandleFunc("/api/userservices/deleteUser/{id}", removeUser)
+	//login verification
+	http.HandleFunc("/api/userservice/login", handlePostLogin)
+}
+
+func Book_Routes() {
+	http.HandleFunc("/getBooks", getBooksFullList)
+	http.HandleFunc("/getBookByName/{bookName}", getBookByName)
+	http.HandleFunc("/getBook/{bookId}", getBook)
+	http.HandleFunc("/addBook", addPostBooks)
+	http.HandleFunc("/update/{bookId}", updatePutBooks)
+	http.HandleFunc("/delete/{bookId}", removeBook)
+}
+
+func Order_Routes() {
+	http.HandleFunc("/api/order/retrieveAllOrders", getOrderList)
+	http.HandleFunc("/api/order/retrieveOrder/{id}", getOrderById)
+	http.HandleFunc("/api/order/cancelOrder/{id}", removeOrder)
+	http.HandleFunc("/api/order/insert", addPostOrder)
+	http.HandleFunc("/api/order/update", updatePutOrder)
+}
+
+func Cart_Routes() {
+	http.HandleFunc("/api/cart/getAll", getCartList)
+	http.HandleFunc("/api/cart/getById/{cartId}", getCartItemById)
+	http.HandleFunc("/api/cart/create", addPostCart)
+	http.HandleFunc("/api/cart/updateById/{cartId}", updatePutCart)
+	http.HandleFunc("/api/cart/delete/{cartId}", removeCartItemById)
+	http.HandleFunc("/api/cart/deleteall", removeCart)
+}

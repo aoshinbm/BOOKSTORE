@@ -3,39 +3,44 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
-// model of order
-// models will specify the attributes of the order record that will be added to the order database
-type ORDER_DETAILS struct {
-	ORDERID   int    `json:id`
-	ITEM_NAME string `json:order_name`
-	ADDRESS   string `json:address`
-	AMOUNT    string `json:amount`
-	STATUS    string `json:status`
-}
-
 var ORDER []ORDER_DETAILS
 var db *sql.DB
 var err error
 
 func main() {
-	DatabaseConnection()
+	// Open up our database connection.
+	db, err = sql.Open("mysql", "root:root@tcp(127.0.0.1:3306)/bookstore")
+	// if there is an error opening the connection, handle it
+	if err != nil {
+		log.Print(err.Error())
+	}
+	defer db.Close()
 
-	or := ORDER_DETAILS{ORDERID: 1, ITEM_NAME: "Harry Potter", ADDRESS: "Goregaon,Mumbai", AMOUNT: "5000", Quantity: 2, STATUS: "Confirmed"}
+	or := ORDER_DETAILS{ORDERID: 1, ITEM_NAME: "Harry Potter", ADDRESS: "Goregaon,Mumbai", AMOUNT: "5000", STATUS: "Confirmed"}
 	ORDER = append(ORDER, or)
 
-	http.HandleFunc("/orders", handleOrderDetails)
-	http.HandleFunc("/order/{id}", handleOrderDetails)
+	http.HandleFunc("/api/order/retrieveAllOrders", getOrderList)
+	http.HandleFunc("/api/order/retrieveOrder/{id}", getOrderById)
+	http.HandleFunc("/api/order/cancelOrder/{id}", removeOrder)
+	http.HandleFunc("/api/order/insert", addPostOrder)
+	http.HandleFunc("/api/order/update", updatePutOrder)
+
+	//Order_Routes()
 
 	//start the server
-	StartServer()
+	fmt.Println("Starting server on port 8082...")
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
+/*
 func handleOrderDetails(w http.ResponseWriter, r *http.Request) {
 	//OrderController
 	//r.method returns which method is the request calling
@@ -51,13 +56,13 @@ func handleOrderDetails(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 	}
-}
+}*/
 
 // ● GET /api/order/retrieveAllOrders - to retrieve all order records
 func getOrderList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// Execute the query
-	results, err := db.Query("SELECT ORDERID ,ITEM_NAME ,ADDRESS,AMOUNT,STATUS FROM OrderDetails")
+	results, err := db.Query("SELECT * FROM OrderDetails")
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
@@ -78,7 +83,7 @@ func getOrderList(w http.ResponseWriter, r *http.Request) {
 func getOrderById(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	var getOrderId ORDER_DETAILS
-	results, err := db.Query("SELECT ORDERID ,ITEM_NAME ,ADDRESS,AMOUNT,STATUS FROM OrderDetails where ORDERID=?", getOrderId.ORDERID)
+	results, err := db.Query("SELECT * FROM OrderDetails where ORDERID=?", getOrderId.ORDERID)
 	if err != nil {
 		panic(err.Error()) // proper error handling instead of panic in your app
 	}
@@ -101,14 +106,10 @@ func addPostOrder(w http.ResponseWriter, r *http.Request) {
 	json.NewDecoder(r.Body).Decode(&postOrder)
 	//read from the request
 	// Execute the query
-	_, err := db.Query("INSERT INTO OrderDetails (ORDERID ,ITEM_NAME ,ADDRESS,AMOUNT,STATUS) VALUES (?,?,?,?,?)")
-	//.Scan(&postOrder.ORDERID, &postOrder.ORDER_NAME, &postOrder.Quantity, &postOrder.STATUS)
+	_, err := db.Query("INSERT INTO orderdetails (ORDERID ,ITEMNAME ,ADDRESS,AMOUNT,STATUS) VALUES (?,?,?,?,?)")
 	if err != nil {
 		panic(err.Error())
 	}
-
-	//ORDER = append(ORDER, postOrder)
-	//json.NewEncoder(w).Encode(ORDER) //optional
 	w.Write([]byte("Data added successfully..."))
 }
 
@@ -135,12 +136,12 @@ func updatePutOrder(w http.ResponseWriter, r *http.Request) {
 
 func removeOrder(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	order_id, err := strconv.Atoi(r.URL.Path[len("/order/{id}"):])
+	order_id, err := strconv.Atoi(r.URL.Path[len("/api/order/cancelOrder/{id}"):])
 	if err != nil {
 		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
 		return
 	}
-	deleteOrderID, err := db.Exec("delete from ORDERDETAILS where BOOKID=?", order_id)
+	deleteOrderID, err := db.Exec("delete from ORDERDETAILS where ORDERID=?", order_id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}

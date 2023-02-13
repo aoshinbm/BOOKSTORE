@@ -11,15 +11,6 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
-type USERREGIST struct {
-	USERID    int    `json:"userid"`
-	Username  string `json:"username"`
-	FirstName string `json:"firstname"`
-	LastName  string `json:"lastname"`
-	Password  string `json:"password"`
-	Email     string `json:"emailid"`
-}
-
 var db *sql.DB
 var USER []USERREGIST
 var err error
@@ -31,6 +22,7 @@ func main() {
 	if err != nil {
 		log.Print(err.Error())
 	}
+
 	defer db.Close()
 
 	u := USERREGIST{USERID: 1, Username: "aoshub", FirstName: "Aoshin", LastName: "Manjuran", Password: "#7Aoshinb", Email: "aoshuthanatos@gmail.com"}
@@ -42,49 +34,57 @@ func main() {
 	u = USERREGIST{USERID: 3, Username: "mandrake", FirstName: "Subin", LastName: "Manjuran", Password: "Khaldrogo!663", Email: "subin@gmail.com"}
 	USER = append(USER, u)
 
-	//http.HandleFunc("/", homePage)
-	http.HandleFunc("/users", handleUserRegistration)
-	http.HandleFunc("/users/{id}", handleUserRegistration)
-	http.HandleFunc("/users/login", getLoginList)
+	//http.HandleFunc("/api/userservices", handleUserRegistration)
+	http.HandleFunc("/api/userservices/getAllUsers", getUsersFullList)
+	http.HandleFunc("/api/userservices/addUser", addPostUsers)
+	http.HandleFunc("/api/userservices/getUser/{id}", getUser)
+	http.HandleFunc("/api/userservices/updateUser/{id}", updatePutUsers)
+	http.HandleFunc("/api/userservices/deleteUser/{id}", removeUser)
+	//login verification
+	http.HandleFunc("/api/userservice/login", handlePostLogin)
 
-	//start the server
+	//User_Routes()
+
 	//start the server
 	fmt.Println("Starting server on port 8082...")
 	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
+/*
 // 2 parameters :- response is interface, request is struct
 func handleUserRegistration(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Handle user regestation is getting called")
 	//r.method returns which method is the request calling
-	/* UserRegistrationController
-	● GET /api/userservice/getAll/{token}: retrieves all user records using the token passed as
-	a parameter
-	● GET /api/userservice/verify/{token}: verifies the given token
-	● POST /api/userservice/login: logs in the user, using the LoginDTO request body
-	*/
-	switch r.Method {
-	case "GET":
+	switch r.URL.Path {
+	case "/api/userservices":
 		//● GET /api/userservice: retrieves all user records
 		getUsersFullList(w, r)
-		//● GET /api/userservice/get/{userId}: retrieves a single user record with the given userId
-	case "POST":
 		//● POST /api/userservice/register: creates a new user record by registering the user, using the UserRegistrationDTO request body
 		addPostUsers(w, r)
-	case "PUT":
+	case "/api/userservices/{id}":
+		//● GET /api/userservice/get/{userId}: retrieves a single user record with the given userId
+		getUser(w, r)
 		//● PUT /api/userservice/update/{userId}: updates a user record with the given userId, using the UserRegistrationDTO request body
 		updatePutUsers(w, r)
-	case "DELETE":
 		//● DELETE /api/userservice/delete/{userId}: deletes a user record with the given userId
 		removeUser(w, r)
 	default:
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
 	}
 }
+*/
 
+/* UserRegistrationController
+● GET /api/userservice/getAll/{token}: retrieves all user records using the token passed as
+a parameter
+● GET /api/userservice/verify/{token}: verifies the given token
+*/
+
+// ● GET /api/userservice/getAllUsers: retrieves all user records
 func getUsersFullList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	// Execute the query
-	results, err := db.Query("SELECT Id ,Username ,FirstName ,LastName ,Password ,Email FROM UserRegistration")
+	results, err := db.Query("SELECT Id ,Username ,FirstName ,LastName ,Password ,Email FROM userregistration")
 	if err != nil {
 		panic(err.Error())
 	}
@@ -100,45 +100,45 @@ func getUsersFullList(w http.ResponseWriter, r *http.Request) {
 	}
 	json.NewEncoder(w).Encode(USER)
 }
+
+// ● GET /api/userservice/getUser/{userId}: retrieves a single user record with the given userId
 func getUser(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Get a User details")
 	w.Header().Set("Content-Type", "application/json")
+	user_Id, err := strconv.Atoi(r.URL.Path[len("/api/userservices/getUser/"):])
 	var gettUser USERREGIST
-	// Execute the query
-	results, err := db.Query("SELECT Id ,Username ,FirstName ,LastName ,Password ,Email FROM UserRegistration where Id=?", gettUser.USERID)
+	result, err := db.Query("SELECT Id ,Username ,FirstName ,LastName ,Password ,Email FROM userregistration where USERID=?", user_Id)
 	if err != nil {
 		panic(err.Error())
 	}
-	for results.Next() {
-		// for each row, scan the result into our tag composite object
-		err := results.Scan(&gettUser.USERID, &gettUser.Username, &gettUser.FirstName, &gettUser.LastName, &gettUser.Password, &gettUser.Email)
+	for result.Next() {
+		err := result.Scan(&gettUser.USERID, &gettUser.Username, &gettUser.FirstName, &gettUser.LastName, &gettUser.Password, &gettUser.Email)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		USER = append(USER, gettUser)
 	}
-	json.NewEncoder(w).Encode(USER)
+	json.NewEncoder(w).Encode(gettUser)
 }
 
+// ● POST /api/userservice/register: creates a new user record by registering the user, using the UserRegistrationDTO request body
 func addPostUsers(w http.ResponseWriter, r *http.Request) {
 	var post USERREGIST
 	w.Header().Set("Content-Type", "application/json")
 	json.NewDecoder(r.Body).Decode(&post)
 	//read from the request
-	// Execute the query
 	_, err := db.Query("INSERT INTO UserRegistration (Id, Username, FirstName, LastName, Password, Email) VALUES (?,?,?,?,?,?)", post.USERID, post.Username, post.FirstName, post.LastName, post.Password, post.Email)
 	if err != nil {
 		panic(err.Error())
 	}
-	//.Scan(&post.USERID,&post.Username, &post.FirstName, &post.LastName, &post.Password, &post.Email)
-	//USER = append(USER, post)
-	//json.NewEncoder(w).Encode(USER) //optional
 	w.Write([]byte("Data added successfully..."))
 }
 
+// ● DELETE /api/userservice/delete/{userId}: deletes a user record with the given userId
 func removeUser(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Remove is getting called")
 	w.Header().Set("Content-Type", "application/json")
-	id, err := strconv.Atoi(r.URL.Path[len("/users/{id}"):])
+	id, err := strconv.Atoi(r.URL.Path[len("/api/userservices/deleteUser/"):])
 	if err != nil {
 		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
 		return
@@ -154,11 +154,14 @@ func removeUser(w http.ResponseWriter, r *http.Request) {
 		panic(err.Error())
 	}
 	print(result)
+	json.NewEncoder(w).Encode(USER)
 	w.Write([]byte("Data DELETED successfully..."))
 }
 
+// ● PUT /api/userservice/update/{userId}: updates a user record with the given userId, using the UserRegistrationDTO request body
 func updatePutUsers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
+
 	id, err := strconv.Atoi(r.URL.Path[len("/users/{id}"):])
 	if err != nil {
 		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
@@ -175,25 +178,45 @@ func updatePutUsers(w http.ResponseWriter, r *http.Request) {
 		panic(err.Error())
 	}
 	print(updated)
+	json.NewEncoder(w).Encode(USER)
 	w.Write([]byte("Data UPDATED successfully..."))
 }
 
+/*
+You will get the post request on login api endpoint
+then you will check if user exist in database with given username and password
+and then get the whole row data with select * from
 
-func getLoginList(w http.ResponseWriter, r *http.Request) {
+and using that data create a stuct of user regeration
+
+and then take userstruct.id as a parameter to CreateToken method from token.go
+it will return a long string
+you have to return it to
+postman
+
+username password email etc
+
+you have to map it to the struct of useregration
+you will create an ohject from sql data.
+
+with w.Write method
+*/
+
+// ● POST /api/userservice/login: logs in the user, using the LoginDTO request body
+func handlePostLogin(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	// Execute the query
-	var userlogin USERREGIST
-	results, err := db.Query("SELECT Username ,Password FROM UserRegistrationwhere Username=?"), userlogin.Username)
+	var userlogin Login
+	var userregistration USERREGIST
+	results, err := db.Query("SELECT * FROM UserRegistration where Username=? and Password=?)", userlogin.Username, userlogin.Password)
 	if err != nil {
-		panic(err.Error())
+		http.Error(w, "Error ", http.StatusBadRequest)
+		return
 	}
 	for results.Next() {
-		err := results.Scan(&userlogin.Username, &userlogin.Password)
+		err := results.Scan(&userregistration.USERID, &userregistration.FirstName, &userregistration.LastName, &userregistration.Email, &userregistration.Username, &userregistration.Password)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			http.Error(w, "USER doesnt Exist", http.StatusInternalServerError)
 			return
 		}
-		//PERSON = append(PERSON, userlogin)
 	}
-	json.NewEncoder(w).Encode(PERSON)
 }

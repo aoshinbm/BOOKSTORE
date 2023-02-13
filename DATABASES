@@ -60,3 +60,10 @@ mysql> desc cartdetails;
 +--------------+--------------+------+-----+---------+----------------+
 5 rows in set (0.00 sec)
 
+
+create table login(
+	Username varchar(100) not null primary key,
+	Password varchar(300) not null 
+);
+
+desc login;
