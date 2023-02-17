@@ -21,6 +21,13 @@ import (
 	_ "github.com/go-sql-driver/mysql"
 )
 
+type CART_DETAILS struct {
+	CARTID       int    `json:cartid`
+	ITEM_NAME    string `json:item_name`
+	Quantity     int    `json:quantity`
+	TOTAL_AMOUNT int    `json:total_amount`
+}
+
 var CART []CART_DETAILS
 var db *sql.DB
 var err error
@@ -34,45 +41,25 @@ func main() {
 	}
 	defer db.Close()
 
-	c1 := CART_DETAILS{CARTID: 1, ITEM_NAME: "Harry Potter Series", Quantity: 2, TOTAL_AMOUNT: 53000}
-	CART = append(CART, c1)
+	//c1 := CART_DETAILS{CARTID: 1, ITEM_NAME: "Harry Potter Series", Quantity: 2, TOTAL_AMOUNT: 53000}
+	//CART = append(CART, c1)
 
 	http.HandleFunc("/api/cart/getAll", getCartList)
-	http.HandleFunc("/api/cart/getById/{cartId}", getCartItemById)
+	http.HandleFunc("/api/cart/getById/", getCartItemById)
 	http.HandleFunc("/api/cart/create", addPostCart)
-	http.HandleFunc("/api/cart/updateById/{cartId}", updatePutCart)
-	http.HandleFunc("/api/cart/delete/{cartId}", removeCartItemById)
+	http.HandleFunc("/api/cart/updateById/", updatePutCart)
+	http.HandleFunc("/api/cart/delete/", removeCartItemById)
 	http.HandleFunc("/api/cart/deleteall", removeCart)
-	//http.HandleFunc("/cart/{id}")
-
-	//Cart_Routes()
 
 	//start the server
 	fmt.Println("Starting server on port 8082...")
 	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
-/*
-func handleCartDetails(w http.ResponseWriter, r *http.Request) {
-	//OrderController
-	//r.method returns which method is the request calling
-	switch r.Method {
-	case "GET":
-	case "PUT":
-		updatePutCart(w, r)
-	case "POST":
-		addPostCart(w, r)
-	case "DELETE":
-		removeCart(w, r)
-	default:
-		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
-	}
-}
-*/
-
 // ● GET /api/cart/getAll: This API is used to retrieve all cart records.
 // It does not take any parameters and returns the ResponseDTO of all cart details.
 func getCartList(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Get ALL is calling")
 	w.Header().Set("Content-Type", "application/json")
 	var getCart CART_DETAILS
 	results, err := db.Query("SELECT * FROM CARTDETAILS")
@@ -93,6 +80,7 @@ func getCartList(w http.ResponseWriter, r *http.Request) {
 // ● GET /api/cart/getById/{cartId}: This API is used to retrieve cart record by cartId.
 // It takes the cartId in the URL parameter and returns the ResponseDTO of specific cart details.
 func getCartItemById(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("Get By ID is calling")
 	w.Header().Set("Content-Type", "application/json")
 	cart_id, err := strconv.Atoi(r.URL.Path[len("/api/cart/getById/"):])
 	var getCartId CART_DETAILS
@@ -126,21 +114,16 @@ func addPostCart(w http.ResponseWriter, r *http.Request) {
 // It takes the cartId in the URL parameter and the updated CartDTO in the request body and returns the ResponseDTO of updated cart record.
 func updatePutCart(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	cart_id, err := strconv.Atoi(r.URL.Path[len("/cart/{id}"):])
+	cart_id, err := strconv.Atoi(r.URL.Path[len("/api/cart/updateById/"):])
 	if err != nil {
 		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
 		return
 	}
-	ress, err := db.Exec("Update CARTDETAILS set ITEM_NAME=?,ADDRESS=?,AMOUNT=? where ORDERID=?)", cart_id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	}
-
-	cartUpdated, err := ress.RowsAffected()
+	ress, err := db.Query("Update CARTDETAILS set ITEM_NAME=?,ADDRESS=?,AMOUNT=? where ORDERID=?)", cart_id)
 	if err != nil {
 		panic(err)
 	}
-	print(cartUpdated)
+	json.NewEncoder(w).Encode(ress)
 	w.Write([]byte("CART UPDATED successfully..."))
 }
 
@@ -148,21 +131,16 @@ func updatePutCart(w http.ResponseWriter, r *http.Request) {
 // It takes the cartId in the URL parameter and returns the ResponseDTO of deleted cart record.
 func removeCartItemById(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	cart_id, err := strconv.Atoi(r.URL.Path[len("/cart/{id}"):])
+	cart_id, err := strconv.Atoi(r.URL.Path[len("/api/cart/delete/"):])
 	if err != nil {
 		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
 		return
 	}
-	deleteCartId, err := db.Exec("delete from CARTDETAILS where CARTID=?", cart_id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	}
-
-	del_Cart, err := deleteCartId.RowsAffected()
+	deleteCartId, err := db.Query("delete from CARTDETAILS where CARTID=?", cart_id)
 	if err != nil {
 		panic(err)
 	}
-	print(del_Cart)
+	json.NewEncoder(w).Encode(deleteCartId)
 	w.Write([]byte("CART ITEM DELETED successfully..."))
 }
 
@@ -170,20 +148,15 @@ func removeCartItemById(w http.ResponseWriter, r *http.Request) {
 // It does not take any parameters and returns the list of deleted cart records.
 func removeCart(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	_, err := strconv.Atoi(r.URL.Path[len("/cart"):])
+	_, err := strconv.Atoi(r.URL.Path[len("/api/cart/deleteall"):])
 	if err != nil {
 		http.Error(w, "Invalid Request ID", http.StatusBadRequest)
 		return
 	}
-	deleteCart, err := db.Exec("delete from CARTDETAILS ")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-	}
-
-	del_Cart, err := deleteCart.RowsAffected()
+	deletee, err := db.Query("delete from CARTDETAILS ")
 	if err != nil {
 		panic(err)
 	}
-	print(del_Cart)
+	json.NewEncoder(w).Encode(deletee)
 	w.Write([]byte("CART DELETED successfully..."))
 }
